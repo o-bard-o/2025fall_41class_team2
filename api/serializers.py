@@ -22,15 +22,20 @@ class UserSerializer(serializers.ModelSerializer):
         return user
     
 
-# [!] Project Serializer 추가
-class ProjectSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Project
-        # 'owner'는 자동으로 설정할 것이므로 필드에 포함하지 않음
-        fields = ['id', 'name', 'created_at']
 
-# [!] Document Serializer 추가
+
+# [!] ProjectSerializer보다 *위에* DocumentSerializer가 오도록 순서 변경
 class DocumentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Document
         fields = ['id', 'original_filename', 'uploaded_at', 'file']
+
+class ProjectSerializer(serializers.ModelSerializer):
+    # [!] 1. 이 줄을 추가합니다.
+    # (이 프로젝트에 속한 'documents'를 DocumentSerializer로 변환하여 포함)
+    documents = DocumentSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Project
+        # [!] 2. 'documents'를 fields에 추가합니다.
+        fields = ['id', 'name', 'created_at', 'documents']
