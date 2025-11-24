@@ -3,17 +3,15 @@
 import os
 from dotenv import load_dotenv
 import chromadb
-# [!] 수정된 import
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_openai import OpenAIEmbeddings
-
-# [!] 1. RAG 체인을 위한 추가 임포트
 from langchain_openai import ChatOpenAI
 from langchain_community.vectorstores import Chroma
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
+
 # .env 파일에서 환경 변수 로드 (OPENAI_API_KEY)
 load_dotenv()
 
@@ -28,11 +26,10 @@ openai_embeddings = OpenAIEmbeddings(
 )
 
 # --- OpenAI LLM (챗봇 모델) ---
-# [!] 2. 챗봇 LLM 모델 초기화 (GPT-4o 사용)
 llm = ChatOpenAI(
     model="gpt-4o",
     api_key=os.getenv("OPENAI_API_KEY"),
-    temperature=0.0 # 답변의 일관성을 위해 0.0으로 설정
+    temperature=0.0  # 답변의 일관성을 위해 0.0으로 설정
 )
 
 # --- 텍스트 분할기 ---
@@ -47,8 +44,8 @@ def process_and_index_pdf(document_obj):
     """
     try:
         file_path = document_obj.file.path
-        project_id = document_obj.project.id
-        document_id = document_obj.id
+        project_id = str(document_obj.project.id)
+        document_id = str(document_obj.id)
 
         # [전략] 프로젝트 ID별로 별도의 컬렉션(테이블)을 사용
         collection_name = f"project_{project_id}"
@@ -63,16 +60,17 @@ def process_and_index_pdf(document_obj):
 
         documents_to_add = []
         metadatas_to_add = []
-        ids_to_add = [] # 각 조각의 고유 ID
+        ids_to_add = []  # 각 조각의 고유 ID
 
         for i, doc in enumerate(split_docs):
             documents_to_add.append(doc.page_content)
             
             # [핵심] 꼬리표(메타데이터)에 document_id를 포함
+            # [!] Fixed: original_filename -> name (model field was updated)
             metadatas_to_add.append({
                 "document_id": document_id,
                 "source_page": doc.metadata.get('page', 0),
-                "original_filename": document_obj.original_filename
+                "name": document_obj.name
             })
             
             # [핵심] 삭제 및 관리를 위한 고유 ID
@@ -81,7 +79,7 @@ def process_and_index_pdf(document_obj):
         if documents_to_add:
             embeddings_to_add = openai_embeddings.embed_documents(documents_to_add)
             collection.add(
-                embeddings = embeddings_to_add,
+                embeddings=embeddings_to_add,
                 documents=documents_to_add,
                 metadatas=metadatas_to_add,
                 ids=ids_to_add
@@ -99,8 +97,8 @@ def remove_document_vectors(document_obj):
     Document 객체에 해당하는 벡터들을 ChromaDB에서 삭제
     """
     try:
-        project_id = document_obj.project.id
-        document_id = document_obj.id
+        project_id = str(document_obj.project.id)
+        document_id = str(document_obj.id)
         collection_name = f"project_{project_id}"
         
         collection = chroma_client.get_collection(name=collection_name)
@@ -116,7 +114,6 @@ def remove_document_vectors(document_obj):
         print(f"❌ [Project: {project_id}, Doc: {document_id}] 벡터 삭제 실패: {e}")
         return False
     
-# [!] 3. 챗봇 질문 처리 함수 (신규 추가)
 def get_rag_answer(project_id, query):
     """
     특정 프로젝트의 RAG 체인을 구성하고 사용자의 질문에 답변합니다.
@@ -132,15 +129,21 @@ def get_rag_answer(project_id, query):
         )
 
         # 2. VectorStore를 'Retriever' (검색기)로 변환
-        # k=5: 가장 관련성 높은 5개의 텍스트 조각을 검색
-        retriever = vector_store.as_retriever(search_kwargs={"k": 5})
+        # k=10: 여러 문서에서 관련성 높은 10개의 텍스트 조각을 검색
+        # 프로젝트에 여러 문서가 있어도 충분한 context를 확보
+        retriever = vector_store.as_retriever(search_kwargs={"k": 10})
 
         # 3. RAG 프롬프트 템플릿 정의
-        # [!] "말투" 기능이 빠진 기본 프롬프트
         template = """
-        당신은 사용자가 업로드한 문서를 기반으로 답변하는 전문적인 AI 어시스턴트입니다.
+        당신은 사용자가 업로드한 여러 문서를 기반으로 답변하는 전문적인 AI 어시스턴트입니다.
         제시된 [Context] 내용을 기반으로만 사용자의 [Question]에 답변하세요.
+        [Context]는 여러 문서에서 추출된 관련 내용들입니다.
         [Context]에 없는 내용은 답변할 수 없다고 솔직하게 말하세요.
+        항상 한글로 대답하고, "Context에 따르면"과 같은 말은 사용하지 마세요.
+        
+        답변 작성 시 마크다운 규칙:
+        - 제목은 H3(###) 이하만 사용하세요 (H1(#), H2(##) 사용 금지)
+        - 리스트, 볼드체, 코드 블록 등 다른 마크다운 요소는 자유롭게 사용하세요
 
         [Context]:
         {context}
@@ -153,7 +156,6 @@ def get_rag_answer(project_id, query):
         prompt = ChatPromptTemplate.from_template(template)
 
         # 4. RAG 체인(Chain) 구성 (LCEL)
-        # (retriever가 context를, 사용자의 query가 query를 채움)
         rag_chain = (
             {"context": retriever, "query": RunnablePassthrough()}
             | prompt
@@ -167,5 +169,4 @@ def get_rag_answer(project_id, query):
 
     except Exception as e:
         print(f"❌ [Project: {project_id}] RAG 답변 생성 실패: {e}")
-        # ChromaDB에 해당 컬렉션이 없거나 비어있을 때 예외 발생 가능
         return "답변을 생성하는 중 오류가 발생했습니다. 프로젝트 ID를 확인하거나, 문서를 업로드했는지 확인하세요."

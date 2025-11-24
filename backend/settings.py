@@ -50,6 +50,7 @@ INSTALLED_APPS = [
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
 ]
+CORS_ALLOW_CREDENTIALS = True  # Allow cookies to be sent
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware', ## <-- 이 줄을 최상단 근처에 추가
@@ -85,26 +86,26 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': BASE_DIR / 'db.sqlite3',
-#     }
-# }
-
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'llm_project_db',             # 1단계에서 생성한 DB 이름
-        'USER': 'django_user',                      # MySQL 사용자 이름
-        'PASSWORD': '1234!@#$',   # [!] 본인의 MySQL 비밀번호로 변경
-        'HOST': 'localhost',                 # 로컬 DB
-        'PORT': '3306',                      # MySQL 기본 포트
-        'OPTIONS': {
-            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'"
-        }
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.mysql',
+#         'NAME': 'llm_project_db',             # 1단계에서 생성한 DB 이름
+#         'USER': 'django_user',                      # MySQL 사용자 이름
+#         'PASSWORD': '1234!@#$',   # [!] 본인의 MySQL 비밀번호로 변경
+#         'HOST': 'localhost',                 # 로컬 DB
+#         'PORT': '3306',                      # MySQL 기본 포트
+#         'OPTIONS': {
+#             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'"
+#         }
+#     }
+# }
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -159,7 +160,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        # API 요청 시 'Authorization: Token ...' 헤더를 확인하도록 설정
-        'rest_framework.authentication.TokenAuthentication',
+        # Use custom cookie-based token authentication
+        'api.authentication.CookieTokenAuthentication',
     ],
 }

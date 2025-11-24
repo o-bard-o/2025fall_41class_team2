@@ -4,15 +4,17 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    path('register/', views.RegisterView.as_view(), name='register'),
-    path('login/', views.CustomLoginView.as_view(), name='login'),
+    path('user', views.RegisterView.as_view(), name='register'), # PUT /user
+    path('login', views.CustomLoginView.as_view(), name='login'),
     
-    # [!] /api/projects/ (GET: 목록, POST: 생성)
-    path('projects/', views.ProjectListCreateView.as_view(), name='project-list-create'),
+    # Projects
+    path('projects', views.ProjectListCreateView.as_view(), name='project-list-create'),
+    path('projects/<uuid:project_id>', views.ProjectDetailView.as_view(), name='project-detail'),
     
-    # [!] /api/documents/upload/ (POST: 파일 업로드)
-    path('documents/upload/', views.DocumentUploadView.as_view(), name='document-upload'),
-    path('documents/<int:document_id>/', views.DocumentDeleteView.as_view(), name='document-delete'),
-    # [!] /api/projects/1/chat/ (POST: 1번 프로젝트에 질문하기)
-    path('projects/<int:project_id>/chat/', views.ChatView.as_view(), name='project-chat'),
+    # Documents
+    path('projects/<uuid:project_id>/documents', views.DocumentListUploadView.as_view(), name='document-list-upload'),
+    path('projects/<uuid:project_id>/documents/<uuid:document_id>', views.DocumentDeleteView.as_view(), name='document-delete'),
+    
+    # Chat
+    path('projects/<uuid:project_id>/messages', views.MessageListCreateView.as_view(), name='message-list-create'),
 ]
