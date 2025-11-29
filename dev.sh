@@ -15,7 +15,7 @@ python manage.py runserver &
 
 # Start Frontend
 echo "⚛️ Starting Next.js Frontend..."
-cd frontend && npm run dev &
+cd frontend && pnpm dev &
 
 # Wait for both processes
 wait
